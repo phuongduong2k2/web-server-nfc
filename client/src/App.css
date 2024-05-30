@@ -1,0 +1,59 @@
+.App {
+  text-align: center;
+  /* background-color: #1e293b; */
+}
+
+.container {
+  margin-top: 100px;
+}
+
+.inputGr {
+  justify-content: center;
+  align-items: center;
+  display: flex;
+}
+
+.fieldsModal {
+  display: flex;
+  flex-direction: column;
+}
+
+.space {
+  width: 18px;
+  height: 18px;
+}
+
+.footerModal {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+}
+
+.userItem {
+  border: 1px solid #64748b;
+  display: flex;
+  align-self: flex-start;
+  margin: 10px;
+  height: 50px;
+  align-items: center;
+  border-radius: 8px;
+  padding: 8px;
+  background-color: #64748b;
+  color: white;
+  transition: 400ms;
+  justify-content: space-between;
+  text-align: start;
+}
+
+.userItem:hover {
+  border: 1px solid white;
+  transition: 400ms;
+  /* cursor: pointer; */
+}
+
+.containerUsers {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
