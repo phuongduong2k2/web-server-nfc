@@ -6,11 +6,12 @@ const userSchema = new mongoose.Schema({
     require: [true, "Data must have name!"],
   },
   pinCode: {
-    type: String,
+    type: Number,
     require: [true, "Pin code is require"],
   },
   nfcId: {
     type: String,
+    unique: true,
   },
 });
 

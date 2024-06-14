@@ -12,7 +12,12 @@ import { createRef, useEffect, useState } from "react";
 const ref = createRef(null);
 
 const PinCodeVerify = (props) => {
-  const { onClose = () => {}, onSubmit = () => {} } = props;
+  const {
+    onSubmit = () => {},
+    title,
+    onClose = () => {},
+    onTransitionExited = () => {},
+  } = props;
 
   const [isOpen, setOpen] = useState(false);
 
@@ -29,29 +34,28 @@ const PinCodeVerify = (props) => {
 
   const handleClose = () => {
     setOpen(false);
+    onClose();
   };
 
   return (
     <Dialog
       open={isOpen}
       onClose={handleClose}
+      onTransitionExited={onTransitionExited}
       PaperProps={{
         component: "form",
         onSubmit: (event) => {
           event.preventDefault();
-          onSubmit();
           const formData = new FormData(event.currentTarget);
           const formJson = Object.fromEntries(formData.entries());
-          const pinCode = formJson.pinCode;
-          console.log(pinCode);
+          onSubmit(formJson);
         },
       }}
     >
-      <DialogTitle>Subscribe</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          To subscribe to this website, please enter your email address here. We
-          will send updates occasionally.
+          To edit this user, you have to enter user's pin code
         </DialogContentText>
         <TextField
           autoFocus
@@ -59,15 +63,15 @@ const PinCodeVerify = (props) => {
           margin="dense"
           id="pinCode"
           name="pinCode"
-          label="Enter your Pin Code"
-          type="text"
+          label="Pin Code"
+          type="number"
           fullWidth
           variant="standard"
         />
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Cancel</Button>
-        <Button type="submit">Subscribe</Button>
+        <Button type="submit">Verify</Button>
       </DialogActions>
     </Dialog>
   );

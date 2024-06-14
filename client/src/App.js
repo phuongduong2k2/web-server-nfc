@@ -1,24 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "@mui/material/Button";
 import "./App.css";
-import {
-  Box,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  duration,
-  Modal,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, Modal, TextField, Typography } from "@mui/material";
 import { Helmet } from "react-helmet";
 import Fade from "@mui/material/Fade";
-import axios from "axios";
-import { SnackbarProvider, enqueueSnackbar } from "notistack";
+import { SnackbarProvider } from "notistack";
 import ConfirmDialog from "./components/ConfirmDialog";
 import PinCodeVerify, { PinCodeVerifyUtils } from "./components/PinCodeVerify";
+import { API } from "./api";
+import { ShowSnackBar } from "./utils";
+import LoadingModal, { LoadingModalUtils } from "./components/LoadingModal";
 
 const style = {
   position: "absolute",
@@ -32,78 +23,120 @@ const style = {
   p: 4,
 };
 
-const API = "http://localhost:8000/api/users";
+const baseData = {
+  id: "",
+  name: "",
+  pinCode: "",
+  nfcId: "",
+};
+
+let timeout = null;
+let interval = null;
 
 function App() {
   const [data, setData] = useState([]);
   const [isOpen, setOpen] = useState(false);
-  const [userSelected, setUserSelected] = useState({});
+  const [userSelected, setUserSelected] = useState(baseData);
 
   const [dialog, setDialog] = useState(false);
 
-  const [newUser, setNewUser] = useState({
-    name: "",
-    pinCode: "",
-    nfcId: "",
-  });
+  const [isVerified, setVerify] = useState(false);
+
+  const [newUser, setNewUser] = useState(baseData);
 
   const getAllUsers = async () => {
-    try {
-      const data = await axios.get(API);
-      let res = data.data.data;
-      const newData = [];
-      for (const key in res) {
-        newData.push(res[key]);
-      }
-      setData(newData);
-    } catch (error) {
+    const data = await API.getAllUsers();
+    if (data) {
+      setData(data);
+    } else {
       openSnackBar("failed", "error");
     }
   };
 
   const createNewUser = async (data) => {
-    try {
-      const res = await axios.post(API, data);
+    const res = await API.createNewUser(data);
+    getAllUsers();
+    if (res.status === 200) {
       setOpen(false);
-      if (res.status === 200) {
-        openSnackBar("Create new user success", "success");
-      }
-    } catch (error) {
+      openSnackBar("Create new user success", "success");
+    } else {
       openSnackBar("failed", "error");
     }
   };
 
   const deleteUser = async (id) => {
-    try {
-      const res = await axios.delete(`${API}/${id}`);
-      if (res.status === 200) {
-        openSnackBar("Delete user success", "success");
-      }
-    } catch (error) {
+    const res = await API.deleteUser(id);
+    getAllUsers();
+    if (res.status === 200) {
+      openSnackBar("Delete user success", "success");
+    } else {
       openSnackBar("failed", "error");
     }
   };
 
+  const verifyUser = async (id, pinCode) => {
+    const res = await API.verifyUser(id, pinCode);
+    setVerify(res.status === 200);
+    if (res.status === 200) {
+      openSnackBar("Verify success", "success");
+      PinCodeVerifyUtils.hide();
+    } else {
+      openSnackBar("Verify failed", "error");
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  const getRequestUser = async () => {
+    await API.createNewUser({
+      name: "null",
+      pinCode: null,
+      nfcId: null,
+    });
+    timeout = setTimeout(async () => {
+      clearInterval(interval);
+      handleClose();
+      LoadingModalUtils.hide();
+      openSnackBar("Failed, please insert your NFC card", "warning");
+      await API.deleteUserRequest();
+    }, 3000);
+    interval = setInterval(async () => {
+      const res = await API.getRequestUser();
+      if (res?.data[0]?.nfcId) {
+        await API.deleteUser(res.data[0]._id);
+        setNewUser({
+          id: res.data[0]._id,
+          name: "",
+          pinCode: 0,
+          nfcId: res.data[0].nfcId,
+        });
+        clearInterval(interval);
+        clearTimeout(timeout);
+      }
+    }, 500);
+  };
+
   useEffect(() => {
     getAllUsers();
-    // eslint-disable-line react-hooks/exhaustive-deps
   }, []);
 
   const handleClose = () => {
     setOpen(false);
+    setVerify(false);
   };
 
   const openSnackBar = (mess, variant) => {
-    enqueueSnackbar(mess, {
-      variant: variant,
-      autoHideDuration: 1000,
-      anchorOrigin: { horizontal: "right", vertical: "top" },
-    });
-    getAllUsers();
+    ShowSnackBar(mess, variant);
+    // getAllUsers();
   };
 
   const renderData = () => {
-    return data.map((ite, index) => (
+    return data?.map((ite, index) => (
       <div key={index} className="userItem">
         <div>
           <Typography id="modal-modal-title" variant="h6" component="h2">
@@ -117,8 +150,14 @@ function App() {
           color="warning"
           variant="contained"
           onClick={() => {
-            setOpen(true);
-            setUserSelected(ite);
+            // setOpen(true);
+            setUserSelected({
+              id: ite._id,
+              name: ite.name,
+              nfcId: ite.nfcId,
+              pinCode: ite.pinCode,
+            });
+            PinCodeVerifyUtils.show();
           }}
         >
           Edit
@@ -127,17 +166,58 @@ function App() {
     ));
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    createNewUser(newUser);
+  const updateUser = async (id, data) => {
+    try {
+      const res = await API.updateUser(id, data);
+      setUserSelected(baseData);
+      getAllUsers();
+      if (res.status === 200) {
+        openSnackBar("Update user success", "success");
+      } else {
+        openSnackBar("Update user failed", "error");
+      }
+    } catch (error) {
+      openSnackBar("failed", "error");
+    }
   };
 
-  const hanldeChangeText = (e) => {
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (userSelected.id) {
+      updateUser(userSelected.id, {
+        name: userSelected.name,
+        pinCode: userSelected.pinCode,
+        nfcId: userSelected.nfcId,
+      });
+    } else {
+      console.log(newUser);
+      createNewUser(newUser);
+    }
+  };
+
+  const hanldeChangeNewUser = (e) => {
     setNewUser({
       ...newUser,
       [e.target.name]: e.target.value,
     });
   };
+
+  const hanldeChangeEditUser = (e) => {
+    setUserSelected({
+      ...userSelected,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  useEffect(() => {
+    if (!!newUser.nfcId) {
+      LoadingModalUtils.hide();
+      return;
+    }
+    if (isOpen && !userSelected?.id) {
+      LoadingModalUtils.show();
+    }
+  }, [isOpen, userSelected, newUser.nfcId]);
 
   const renderAddModal = () => {
     return (
@@ -148,7 +228,8 @@ function App() {
         <div className="space" />
         <div className="fieldsModal">
           <TextField
-            onChange={hanldeChangeText}
+            value={newUser.name}
+            onChange={hanldeChangeNewUser}
             name="name"
             id="outlined-basic"
             label="Name"
@@ -157,16 +238,19 @@ function App() {
           />
           <div className="space" />
           <TextField
-            onChange={hanldeChangeText}
+            value={newUser.pinCode}
+            onChange={hanldeChangeNewUser}
             name="pinCode"
             id="out"
             label="Pin Code"
+            type="number"
             variant="outlined"
             required
           />
           <div className="space" />
           <TextField
-            onChange={hanldeChangeText}
+            value={newUser.nfcId}
+            onChange={hanldeChangeNewUser}
             name="nfcId"
             id="outlin"
             label="NFC ID"
@@ -182,6 +266,12 @@ function App() {
             style={{ marginLeft: 10 }}
             onClick={() => {
               handleClose();
+              setNewUser({
+                id: "",
+                name: "",
+                pinCode: "",
+                nfcId: "",
+              });
             }}
           >
             Cancel
@@ -205,11 +295,32 @@ function App() {
           <TextField
             id="outlined-basic"
             label="Name"
+            name="name"
             variant="outlined"
+            required
             value={userSelected?.name}
+            onChange={hanldeChangeEditUser}
           />
           <div className="space" />
-          <TextField id="outlined-basic" label="NFC ID" variant="outlined" />
+          <TextField
+            id="outlined-basic"
+            label="Pin code"
+            name="pinCode"
+            variant="outlined"
+            required
+            value={userSelected?.pinCode}
+            onChange={hanldeChangeEditUser}
+          />
+          <div className="space" />
+          <TextField
+            id="outlined-basic"
+            label="NFC ID"
+            name="nfcId"
+            variant="outlined"
+            required
+            value={userSelected?.nfcId}
+            onChange={hanldeChangeEditUser}
+          />
         </div>
         <div className="space" />
         <div className="footerModal">
@@ -235,6 +346,7 @@ function App() {
           </Button>
           <Button
             variant="contained"
+            type="submit"
             style={{ marginLeft: 10 }}
             onClick={() => {
               handleClose();
@@ -250,7 +362,20 @@ function App() {
   return (
     <div className="App">
       <SnackbarProvider maxSnack={5} />
-      <PinCodeVerify />
+      <LoadingModal />
+      <PinCodeVerify
+        onTransitionExited={() => {
+          if (isVerified) {
+            setOpen(true);
+          } else {
+            setUserSelected({});
+          }
+        }}
+        title={`Verify "${userSelected?.name}"`}
+        onSubmit={async (data) => {
+          verifyUser(userSelected.id, data.pinCode);
+        }}
+      />
       <ConfirmDialog
         title={"Confirm!"}
         description="After delete this user is not exist on DB"
@@ -260,7 +385,7 @@ function App() {
         }}
         onConfirm={() => {
           setDialog(false);
-          deleteUser(userSelected._id);
+          deleteUser(userSelected.id);
           handleClose();
         }}
       />
@@ -270,9 +395,7 @@ function App() {
           color="error"
           variant="outlined"
           style={{ marginLeft: 10 }}
-          onClick={() => {
-            PinCodeVerifyUtils.show();
-          }}
+          onClick={() => {}}
         >
           Test
         </Button>
@@ -288,7 +411,7 @@ function App() {
         >
           <Fade in={isOpen}>
             <Box sx={style} component="form" onSubmit={handleSubmit}>
-              {userSelected?._id ? renderEditModal() : renderAddModal()}
+              {userSelected?.id ? renderEditModal() : renderAddModal()}
             </Box>
           </Fade>
         </Modal>
@@ -298,6 +421,7 @@ function App() {
             style={{ marginLeft: 10 }}
             onClick={() => {
               setOpen(true);
+              getRequestUser();
             }}
           >
             Add user
