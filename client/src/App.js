@@ -391,14 +391,6 @@ function App() {
       />
       <Helmet bodyAttributes={{ style: "background-color : #1E293B" }} />
       <div className="container">
-        <Button
-          color="error"
-          variant="outlined"
-          style={{ marginLeft: 10 }}
-          onClick={() => {}}
-        >
-          Test
-        </Button>
         <Modal
           closeAfterTransition
           onTransitionExited={() => {
