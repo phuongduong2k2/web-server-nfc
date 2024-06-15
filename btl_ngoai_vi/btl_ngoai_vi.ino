@@ -94,21 +94,17 @@ void loop() {
     if (id != "null") {
       response = requestToWebServer("update", id);
     } else {
+      digitalWrite(LED_PIN, LOW);
+      char mess[] = "failed";
+      sendMessage(mess);
       failedSound();
     }
     return;
   }
   Serial.println(nameUser);
-
-  // if (idCard == getCardNumber()) {
-  //   digitalWrite(LED_PIN, HIGH);
-  //   char mess[] = "success";
-  //   sendMessage(mess);
-  // } else {
-  //   digitalWrite(LED_PIN, LOW);
-  //   char mess[] = "failed";
-  //   sendMessage(mess);
-  // }
+  digitalWrite(LED_PIN, HIGH);
+  char mess[] = "success "+ nameUser + " is loging!";
+  sendMessage(mess);
 }
 void sendMessage(char* message){
   if(WiFi.status()== WL_CONNECTED){
