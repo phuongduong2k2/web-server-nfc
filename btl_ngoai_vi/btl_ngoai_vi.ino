@@ -18,21 +18,16 @@ String serverName = "https://api.telegram.org/bot" + token + method + "?chat_id=
 
 String API = "http://192.168.179.173:8000/api/users";
 
-#define SS_PIN 15 //D8  
-#define RST_PIN 2 //D4
-#define LED_PIN D2
-#define BUZZER_PIN D1
+#define SS_PIN 15  //D8
+#define RST_PIN 2  //D4
+#define LED_PIN 4
+#define BUZZER_PIN 5
 MFRC522 mfrc522(SS_PIN, RST_PIN);
-
-#define chat_id 834129953
-#define api_token "6704284569:AAHC99ANtQrL41jyPZeCk_zIdXXdZ2LXtRw"
-#define jsondata = ""
 
 // ESP8266WebServer server(80);
 
 int total_card;
 String card_num;
-String idCard = "30B73F14";
 
 unsigned long lastTime = 0;
 unsigned long timerDelay = 5000;
@@ -42,7 +37,7 @@ void setup() {
 
   WiFi.begin(ssid, password);
   Serial.println("Connecting");
-  while(WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
@@ -60,7 +55,7 @@ void setup() {
 }
 void failedSound() {
   int count = 0;
-  while(count<=2) {
+  while (count <= 2) {
     count++;
     digitalWrite(BUZZER_PIN, HIGH);
     delay(100);
@@ -69,7 +64,7 @@ void failedSound() {
   }
 }
 void loop() {
-  if ( ! mfrc522.PICC_IsNewCardPresent() || ! mfrc522.PICC_ReadCardSerial() || WiFi.status() != WL_CONNECTED){
+  if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial() || WiFi.status() != WL_CONNECTED) {
     return;
   }
   digitalWrite(BUZZER_PIN, HIGH);
@@ -103,34 +98,33 @@ void loop() {
   }
   Serial.println(nameUser);
   digitalWrite(LED_PIN, HIGH);
-  char mess[] = "success "+ nameUser + " is loging!";
+  char mess[] = "success";
   sendMessage(mess);
 }
-void sendMessage(char* message){
-  if(WiFi.status()== WL_CONNECTED){
+void sendMessage(char* message) {
+  if (WiFi.status() == WL_CONNECTED) {
 
-    std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+    std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
     client->setInsecure();
 
     WiFiClient wifiClient;
     HTTPClient http;
     Serial.println("Sending...");
     int i = 0;
-    String serverPath = serverName +  "&text=";
-    for(i;message[i] != '\0';i++) {
-      serverPath += *(message+i);
+    String serverPath = serverName + "&text=";
+    for (i; message[i] != '\0'; i++) {
+      serverPath += *(message + i);
     }
-    
+
     Serial.println(serverPath);
-    http.begin(*client, serverPath); 
-    int httpResponseCode = http.GET();
-    if (httpResponseCode>0) {
+    http.begin(*client, serverPath);
+    int httpResponseCode = http.POST();
+    if (httpResponseCode > 0) {
       Serial.print("HTTP Response code: ");
       Serial.println(httpResponseCode);
       String payload = http.getString();
       Serial.println(payload);
-    }
-    else {
+    } else {
       Serial.print("Error code: ");
       Serial.println(httpResponseCode);
     }
@@ -139,39 +133,38 @@ void sendMessage(char* message){
 }
 String requestToWebServer(const char* type, String id) {
   String payload = "";
-  if(WiFi.status()== WL_CONNECTED){
+  if (WiFi.status() == WL_CONNECTED) {
     WiFiClient wifiClient;
     HTTPClient http;
     Serial.println("Sending...");
 
     String serverPath = "";
 
-    
+
     int httpResponseCode = 0;
 
     Serial.println(type);
     if (type == "verify") {
-      serverPath = API+"/verify/"+getCardNumber();
-      http.begin(wifiClient, serverPath); 
-      httpResponseCode = http.GET();  
+      serverPath = API + "/verify/" + getCardNumber();
+      http.begin(wifiClient, serverPath);
+      httpResponseCode = http.GET();
     }
     if (type == "getReq") {
-      serverPath = API+"/verify";
-      http.begin(wifiClient, serverPath); 
+      serverPath = API + "/verify";
+      http.begin(wifiClient, serverPath);
       httpResponseCode = http.GET();
     }
     if (type == "update") {
       serverPath = API + "/" + id + "?nfcId=" + getCardNumber();
-      http.begin(wifiClient, serverPath); 
+      http.begin(wifiClient, serverPath);
       httpResponseCode = http.PATCH({});
     }
     Serial.println(serverPath);
-    if (httpResponseCode>0) {
+    if (httpResponseCode > 0) {
       Serial.print("HTTP Response code: ");
       Serial.println(httpResponseCode);
       payload = http.getString();
-    } 
-    else {
+    } else {
       Serial.print("Error code: ");
       Serial.println(httpResponseCode);
     }
@@ -179,7 +172,7 @@ String requestToWebServer(const char* type, String id) {
   }
   return payload;
 }
-String getCardNumber(){
+String getCardNumber() {
   String UID = "";
   for (byte i = 0; i < mfrc522.uid.size; i++) {
     UID += String(mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
@@ -188,5 +181,3 @@ String getCardNumber(){
   UID.toUpperCase();
   return UID;
 }
-
-
